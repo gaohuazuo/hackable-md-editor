@@ -4,7 +4,16 @@ function getConfig(key) {
 }
 
 function saveConfig() {
-  if (arguments.length == 1) {
+  if (arguments.length == 0) {
+    saveConfig({
+      md_options: md_options,
+      md_plugins: md_plugins,
+      md_headers: md_headers,
+      active_md_headers: active_md_headers,
+      html_headers: html_headers,
+      active_html_headers: active_html_headers
+    });
+  } else if (arguments.length == 1) {
     for (var k in arguments[0]) {
       localStorage.setItem(k, JSON.stringify(arguments[0][k]));
     }
