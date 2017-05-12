@@ -155,8 +155,9 @@ require(['codemirror/lib/codemirror', 'MarkdownIt', 'diffDOM', 'codemirror/mode/
           var old_html = document.querySelector("#preview > iframe").contentDocument.documentElement;
           var new_document = dom_parser.parseFromString(md.render(getMarkdownHeader() + cm_editor.getValue()), 'text/html');
           var head_elements = getHTMLHeadElement();
-          for (var i = 0; i < head_elements.length; i++) {
-            new_document.head.appendChild(head_elements[i]);
+          var first_child = new_document.head.firstChild;
+          for (var i = head_elements.length - 1; i >= 0; i--) {
+            first_child = new_document.head.insertBefore(head_elements[i], first_child);
           }
           diff_dom.apply(old_html, diff_dom.diff(old_html, new_document.documentElement));
         }
