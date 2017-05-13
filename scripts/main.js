@@ -97,7 +97,7 @@ var resetCompiler = (function() {
 
       var md = MarkdownIt(config.md_options);
       for (var i = 0; i < active_plugins.length; i++) {
-        arguments[i](md, plugin_options[i]);
+        arguments[i+1](md, plugin_options[i]);
       }
 
       compile = function() {
