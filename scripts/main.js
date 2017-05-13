@@ -70,6 +70,68 @@ function getHTMLHeadElements() {
   return result;
 }
 
+function render() {
+  if (typeof compile === 'undefined') return;
+  new_html = compile()
+  var old_html = document.querySelector("#preview > iframe").contentDocument.documentElement;
+  diff_dom.apply(old_html, diff_dom.diff(old_html, new_html));
+}
+
+var resetCompiler = (function() {
+  var call_generation = 0;
+
+  return function() {
+    var my_generation = ++call_generation;
+
+    var active_plugins = [];
+    var plugin_options = [];
+    for (var name in config.md_plugins) {
+      if (config.md_plugins[name][0]) {
+        active_plugins.push(config.md_plugins[name][1]);
+        plugin_options.push(config.md_plugins[name][2]);
+      }
+    }
+
+    require(['MarkdownIt'].concat(active_plugins), function(MarkdownIt) {
+      if (my_generation != call_generation) return;
+
+      var md = MarkdownIt(config.md_options);
+      for (var i = 0; i < active_plugins.length; i++) {
+        arguments[i](md, plugin_options[i]);
+      }
+
+      compile = function() {
+        var new_document = dom_parser.parseFromString(md.render(getMarkdownHeader() + cm_editor.getValue()), 'text/html');
+        var head_elements = getHTMLHeadElements();
+        var first_child = new_document.head.firstChild;
+        for (var i = head_elements.length - 1; i >= 0; i--) {
+          first_child = new_document.head.insertBefore(head_elements[i], first_child);
+        }
+        return new_document.documentElement;
+      }
+
+      render();
+    });
+  }
+})();
+
+function download() {
+  var url = URL.createObjectURL(new Blob([compile().outerHTML], {type: 'text/html'}));
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'export.html';
+  document.body.appendChild(a);
+  a.click();
+  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
+var compile;
+var save;
+var cm_editor;
+var diff_dom;
+var dom_parser = new DOMParser();
+
 require.config({
   paths: {
     codemirror: 'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.25.2',
@@ -108,7 +170,9 @@ require(['codemirror/lib/codemirror', 'MarkdownIt', 'diffDOM', 'codemirror/mode/
     });
   })();
 
-  var cm_editor = (function() {
+  diff_dom = new diffDOM();
+
+  cm_editor = (function() {
     var cm_config = localStorage.getItem('cm_config');
     if (cm_config == null) {
       cm_config = {};
@@ -123,51 +187,7 @@ require(['codemirror/lib/codemirror', 'MarkdownIt', 'diffDOM', 'codemirror/mode/
     return CodeMirror(document.querySelector("#editor"), cm_config);
   })();
 
-  var render;
-  var diff_dom = new diffDOM();
-  var dom_parser = new DOMParser();
-
-  var resetRenderer = (function() {
-    var call_generation = 0;
-
-    return function() {
-      var my_generation = ++call_generation;
-      render = function(){};
-
-      var active_plugins = [];
-      var plugin_options = [];
-      for (var name in config.md_plugins) {
-        if (config.md_plugins[name][0]) {
-          active_plugins.push(config.md_plugins[name][1]);
-          plugin_options.push(config.md_plugins[name][2]);
-        }
-      }
-
-      require(active_plugins, function() {
-        if (my_generation != call_generation) return;
-
-        var md = MarkdownIt(config.md_options);
-        for (var i = 0; i < active_plugins.length; i++) {
-          arguments[i](md, plugin_options[i]);
-        }
-
-        render = function() {
-          var old_html = document.querySelector("#preview > iframe").contentDocument.documentElement;
-          var new_document = dom_parser.parseFromString(md.render(getMarkdownHeader() + cm_editor.getValue()), 'text/html');
-          var head_elements = getHTMLHeadElements();
-          var first_child = new_document.head.firstChild;
-          for (var i = head_elements.length - 1; i >= 0; i--) {
-            first_child = new_document.head.insertBefore(head_elements[i], first_child);
-          }
-          diff_dom.apply(old_html, diff_dom.diff(old_html, new_document.documentElement));
-        }
-
-        render();
-      });
-    };
-  })();
-
-  var save = (function() {
+  save = (function() {
     var cm_last_state = cm_editor.changeGeneration();
     return function() {
       if (!cm_editor.isClean(cm_last_state)) {
@@ -176,7 +196,7 @@ require(['codemirror/lib/codemirror', 'MarkdownIt', 'diffDOM', 'codemirror/mode/
     }
   })();
 
-  resetRenderer();
+  resetCompiler();
 
   cm_editor.on("changes", function() {
     save();
