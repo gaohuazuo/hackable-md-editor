@@ -1,3 +1,15 @@
+var config = {
+  md_options: getConfig('md_options') || {html: true, linkify: true, typographer: true},
+  md_plugins: getConfig('md_plugins') || {
+    mathjax: [false, 'https://rawgit.com/gaohuazuo/markdown-it-mathjax/master/markdown-it-mathjax.js'],
+    headerless_table: [false, 'https://rawgit.com/gaohuazuo/markdown-it-headerless-table/master/headerless-table.js']
+  },
+  md_headers: getConfig('md_headers') || {},
+  active_md_headers: getConfig('active_md_headers') || [],
+  html_headers: getConfig('html_headers') || {},
+  active_html_headers: getConfig('active_html_headers') || []
+};
+
 function getConfig(key) {
   var value = localStorage.getItem(key);
   return value ? JSON.parse(value) : null;
@@ -5,14 +17,7 @@ function getConfig(key) {
 
 function saveConfig() {
   if (arguments.length == 0) {
-    saveConfig({
-      md_options: md_options,
-      md_plugins: md_plugins,
-      md_headers: md_headers,
-      active_md_headers: active_md_headers,
-      html_headers: html_headers,
-      active_html_headers: active_html_headers
-    });
+    saveConfig(config);
   } else if (arguments.length == 1) {
     for (var k in arguments[0]) {
       localStorage.setItem(k, JSON.stringify(arguments[0][k]));
@@ -27,26 +32,19 @@ function saveConfig() {
   }
 }
 
-var md_options = getConfig('md_options') || {html: true, linkify: true, typographer: true};
+function dumpConfig() {
+  return JSON.stringify(config);
+}
 
-var md_plugins = getConfig('md_plugins') || {
-  mathjax: [false, 'https://rawgit.com/gaohuazuo/markdown-it-mathjax/master/markdown-it-mathjax.js'],
-  headerless_table: [false, 'https://rawgit.com/gaohuazuo/markdown-it-headerless-table/master/headerless-table.js']
-};
-
-var md_headers = getConfig('md_headers') || {};
-
-var active_md_headers = getConfig('active_md_headers') || [];
-
-var html_headers = getConfig('html_headers') || {};
-
-var active_html_headers = getConfig('active_html_headers') || [];
+function loadConfig(config_str) {
+  config = JSON.parse(config_str);
+}
 
 function getActivePlugins() {
   var active_plugins = [];
-  for (var name in md_plugins) {
-    if (md_plugins[name][0]) {
-      active_plugins.push(md_plugins[name][1]);
+  for (var name in config.md_plugins) {
+    if (config.md_plugins[name][0]) {
+      active_plugins.push(config.md_plugins[name][1]);
     }
   }
   return active_plugins;
@@ -54,20 +52,22 @@ function getActivePlugins() {
 
 function getMarkdownHeader() {
   var header = '';
-  for (var name in active_md_headers) {
-    header += md_headers[name];
+  for (var name in config.active_md_headers) {
+    header += config.md_headers[name];
   }
   return header;
 }
 
-function getHTMLHeadElement() {
-  var header = '';
-  for (var i = 0; i < active_html_headers.length; i++) {
-    header += html_headers[active_html_headers[i]];
+function getHTMLHeadElements() {
+  var result = [];
+  var head_node = document.createElement('head');
+  for (var i = 0; i < config.active_html_headers.length; i++) {
+    head_node.innerHTML = config.active_html_headers[i];
+    for (var j = 0; j < head_node.childNodes.length; j++) {
+      result.push(head_node.childNodes[j]);
+    }
   }
-  var head_elem = document.createElement('head');
-  head_elem.innerHTML = header;
-  return head_elem.childNodes;
+  return result;
 }
 
 require.config({
@@ -136,17 +136,17 @@ require(['codemirror/lib/codemirror', 'MarkdownIt', 'diffDOM', 'codemirror/mode/
 
       var active_plugins = [];
       var plugin_options = [];
-      for (var name in md_plugins) {
-        if (md_plugins[name][0]) {
-          active_plugins.push(md_plugins[name][1]);
-          plugin_options.push(md_plugins[name][2]);
+      for (var name in config.md_plugins) {
+        if (config.md_plugins[name][0]) {
+          active_plugins.push(config.md_plugins[name][1]);
+          plugin_options.push(config.md_plugins[name][2]);
         }
       }
 
       require(active_plugins, function() {
         if (my_generation != call_generation) return;
 
-        var md = MarkdownIt(md_options);
+        var md = MarkdownIt(config.md_options);
         for (var i = 0; i < active_plugins.length; i++) {
           arguments[i](md, plugin_options[i]);
         }
@@ -154,7 +154,7 @@ require(['codemirror/lib/codemirror', 'MarkdownIt', 'diffDOM', 'codemirror/mode/
         render = function() {
           var old_html = document.querySelector("#preview > iframe").contentDocument.documentElement;
           var new_document = dom_parser.parseFromString(md.render(getMarkdownHeader() + cm_editor.getValue()), 'text/html');
-          var head_elements = getHTMLHeadElement();
+          var head_elements = getHTMLHeadElements();
           var first_child = new_document.head.firstChild;
           for (var i = head_elements.length - 1; i >= 0; i--) {
             first_child = new_document.head.insertBefore(head_elements[i], first_child);
@@ -177,7 +177,6 @@ require(['codemirror/lib/codemirror', 'MarkdownIt', 'diffDOM', 'codemirror/mode/
   })();
 
   resetRenderer();
-  render();
 
   cm_editor.on("changes", function() {
     save();
