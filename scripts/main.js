@@ -52,8 +52,8 @@ function getActivePlugins() {
 
 function getMarkdownHeader() {
   var header = '';
-  for (var name in config.active_md_headers) {
-    header += config.md_headers[name];
+  for (var i = 0; i < config.active_md_headers.length; i++) {
+    header += config.md_headers[config.active_md_headers[i]];
   }
   return header;
 }
@@ -62,7 +62,7 @@ function getHTMLHeadElements() {
   var result = [];
   var head_node = document.createElement('head');
   for (var i = 0; i < config.active_html_headers.length; i++) {
-    head_node.innerHTML = config.active_html_headers[i];
+    head_node.innerHTML = config.html_headers[config.active_html_headers[i]];
     for (var j = 0; j < head_node.childNodes.length; j++) {
       result.push(head_node.childNodes[j]);
     }
